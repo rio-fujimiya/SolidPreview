@@ -26,11 +26,12 @@ $wanted = @(foreach ($format in $all) {
 })
 if (-not $wanted.Count) { throw 'No supported extensions requested.' }
 New-Item -ItemType Directory -Path $root -Force | Out-Null
-$versionDir = Join-Path $root 'v1.0.18'
+$versionDir = Join-Path $root 'v1.0.20'
 New-Item -ItemType Directory -Path $versionDir -Force | Out-Null
 $dll = Join-Path $versionDir 'SolidPreview.dll'
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-& $csc /nologo /target:library /platform:x64 /optimize+ "/out:$dll" /r:System.Drawing.dll /r:System.Web.Extensions.dll (Join-Path $PSScriptRoot 'Handler.cs')
+$windowsBase = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsBase.dll'
+& $csc /nologo /target:library /platform:x64 /optimize+ "/out:$dll" /r:System.Drawing.dll /r:System.Web.Extensions.dll "/r:$windowsBase" (Join-Path $PSScriptRoot 'Handler.cs')
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $dll)) { throw 'C# compile failed. Registry unchanged.' }
 [void][Reflection.Assembly]::LoadFrom($dll)
 $test = Join-Path $env:TEMP ('SolidPreview-test-' + [guid]::NewGuid().ToString('N'))
@@ -103,6 +104,7 @@ try {
         $ext = $f.ext; $model = Join-Path $test ('model'+$ext)
         $sample = $SampleFiles | Where-Object { [IO.Path]::GetExtension($_) -ieq $ext } | Select-Object -First 1
         if ($sample) { Copy-Item -LiteralPath $sample -Destination $model }
+        elseif ($ext -eq '.3dm') { Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'tests\box.3dm') -Destination $model }
         elseif ($ext -in '.sc','.solidcraft') { if (-not (Invoke-Cli @('run',$box,'--save',$model))) { continue } }
         elseif ($ext -in '.igs','.iges') { Write-Warning "Provide -SampleFiles for $ext"; continue }
         else {
@@ -112,9 +114,9 @@ try {
         }
         if (-not (Test-Path -LiteralPath $model)) { continue }
         $inputFile = $model
-        if ($ext -in '.stl','.obj','.3mf','.igs','.iges') {
+        if ($ext -in '.stl','.obj','.3mf','.igs','.iges','.3dm') {
             $inputFile = Join-Path $test ('import'+$ext+'.json')
-            $command = if ($ext -in '.igs','.iges') { 'doc.open' } else { 'file.insert_mesh' }
+            $command = if ($ext -in '.igs','.iges','.3dm') { 'doc.open' } else { 'file.insert_mesh' }
             $json = @{commands=@(@{command=$command;params=@{path=$model}})} | ConvertTo-Json -Depth 8 -Compress
             [IO.File]::WriteAllText($inputFile,$json,$utf8)
         }
@@ -201,7 +203,7 @@ try {
 Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class ShellNotify { [DllImport("shell32.dll")] public static extern void SHChangeNotify(uint e,uint f,IntPtr a,IntPtr b); }'
 [ShellNotify]::SHChangeNotify(0x08000000,0,[IntPtr]::Zero,[IntPtr]::Zero)
 Write-Host ('Registered: '+ (($good | ForEach-Object ext) -join ', ')) -ForegroundColor Green
-Write-Host 'Installed handler v1.0.18. Restart Explorer and prevhost if the previous version is still loaded. Use Alt+P and Large icons.'
+Write-Host 'Installed handler v1.0.20. Restart Explorer and prevhost if the previous version is still loaded. Use Alt+P and Large icons.'
 if ($orbitFormats.Count) { Write-Host ('Orbit enabled for: '+($orbitFormats -join ', ')); Write-Host 'Preview: left/right drag to orbit, wheel to zoom, middle drag to pan; ViewCube navigation resets framing.' }
 
 if ($liveFormats.Count) { Write-Host ('Live MCP enabled for: '+($liveFormats -join ', ')) }

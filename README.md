@@ -13,12 +13,13 @@
 - Interactive orientation cube: select faces, edges and corners for 26 standard directions; at face views, arrows navigate to neighboring faces in 90° steps.
 - Mouse-drag orbit, wheel zoom, middle-button pan, Home button and adaptive preview resolution (up to 2048 px on the long edge; 960 px while dragging).
 - Shared PNG disk cache; a private persistent headless SolidCraft MCP session when supported, with CLI snapshot fallback.
+- Existing 3MF package thumbnails are displayed without rendering a replacement. For 3DM, the installed Rhino thumbnail handler is used when available; otherwise SolidCraft renders the thumbnail.
 - Per-user setup and registry rollback; no change to default applications.
 
 ## Requirements
 
 - Windows 11 x64 (ARM64 and other versions are not validated).
-- 64-bit Windows PowerShell 5.1 and .NET Framework 4.x with the built-in C# compiler.
+- 64-bit Windows PowerShell 5.1 and .NET Framework 4.x with WPF and the built-in C# compiler.
 - A working `solidcraft-cli.exe`, installed separately from [SolidCraft](https://docs.solidcraft.io/). CLI 0.45.0 was used during early user testing.
 
 The package contains source and scripts, not prebuilt binaries. Review them before running. No administrator rights should be needed under ordinary per-user COM policy. Installing changes which preview/thumbnail handlers Explorer uses; it may affect Explorer stability.
@@ -48,12 +49,17 @@ Select a model in Explorer and press `Alt+P` to show the preview pane. Use Large
 | STEP | `.stp`, `.step` | Default |
 | Mesh | `.stl`, `.obj`, `.3mf` | Default |
 | SolidCraft | `.sc`, `.solidcraft` | Default |
+| Rhino | `.3dm` | Opt-in; requires a CLI with 3DM import support |
 | IGES | `.igs`, `.iges` | Opt-in; supply a known-good sample |
+
+For 3DM the installer checks rendering with the included synthetic box; `-SampleFiles` can override it with your own `.3dm` file. Import coverage depends on the SolidCraft version and model contents; files without supported geometry may not render.
+
+For 3MF files without a package thumbnail, and 3DM files when Rhino's thumbnail handler returns no image or is unavailable, SolidPreview renders a thumbnail as before. Invalid or oversized 3MF thumbnails are reported in the host log instead of being replaced. The preview pane remains independent of embedded thumbnails. Explorer may retain previously cached thumbnails.
 
 For the opt-in formats, pass arrays through PowerShell’s `-Command` option:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '.\Install.ps1' -Extensions @('.stp','.igs') -SampleFiles @('C:\Models\sample.igs')"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& '.\Install.ps1' -Extensions @('.stp','.3dm','.igs') -SampleFiles @('C:\Models\sample.igs')"
 ```
 
 ## Update and uninstall

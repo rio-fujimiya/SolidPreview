@@ -30,5 +30,7 @@ Desktop.ini
 *.igs
 *.obj
 *.3mf
+*.3dm
+!tests/box.3dm
 *.sc
 *.solidcraft

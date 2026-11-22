@@ -6,6 +6,7 @@ using System.Text;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.IO.Packaging;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
@@ -59,12 +60,12 @@ namespace SolidPreview {
   }
   [DllImport("gdi32.dll",SetLastError=true)] static extern IntPtr CreateDIBSection(IntPtr dc,ref BITMAPINFOHEADER info,uint usage,out IntPtr bits,IntPtr section,uint offset);
   [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] internal static extern bool MoveFileEx(string source,string destination,uint flags);
-  internal static IntPtr MakeDib(Bitmap b) {
+  internal static IntPtr MakeDib(Bitmap b,bool alpha=false) {
    var info=new BITMAPINFOHEADER{Size=40,Width=b.Width,Height=-b.Height,Planes=1,BitCount=32};
    IntPtr bits; IntPtr h=CreateDIBSection(IntPtr.Zero,ref info,0,out bits,IntPtr.Zero,0);
    if(h==IntPtr.Zero || bits==IntPtr.Zero){if(h!=IntPtr.Zero)DeleteObject(h);throw new IOException("CreateDIBSection failed: "+Marshal.GetLastWin32Error());}
    try {
-    var data=b.LockBits(new Rectangle(0,0,b.Width,b.Height),ImageLockMode.ReadOnly,PixelFormat.Format32bppRgb);
+    var data=b.LockBits(new Rectangle(0,0,b.Width,b.Height),ImageLockMode.ReadOnly,alpha?PixelFormat.Format32bppPArgb:PixelFormat.Format32bppRgb);
     try { int stride=checked(b.Width*4); byte[] row=new byte[stride]; for(int y=0;y<b.Height;y++){Marshal.Copy(IntPtr.Add(data.Scan0,y*data.Stride),row,0,stride);Marshal.Copy(row,0,IntPtr.Add(bits,y*stride),stride);} }
     finally {b.UnlockBits(data);}
     return h;
@@ -86,6 +87,57 @@ namespace SolidPreview {
   static readonly object logGate=new object();
   internal static void Log(string msg) {try {lock(logGate) {string root=Cache; Directory.CreateDirectory(root); string path=Path.Combine(root,"host-"+Process.GetCurrentProcess().Id+".log"); if(File.Exists(path)&&new FileInfo(path).Length>1024*1024) File.Delete(path); File.AppendAllText(path,DateTime.Now.ToString("HH:mm:ss.fff")+" T"+Thread.CurrentThread.ManagedThreadId+" "+msg+Environment.NewLine);}}catch{}}
 
+ }
+ [ComImport, Guid("B7D14566-0509-4CCE-A71F-0A554233BD9B"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+ interface IInitializeWithFile { [PreserveSig] int Initialize([MarshalAs(UnmanagedType.LPWStr)] string path,uint mode); }
+ [ComImport, Guid("E357FCCD-A995-4576-B01F-234630154E96"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+ interface IExternalThumbnailProvider { [PreserveSig] int GetThumbnail(uint cx,out IntPtr bitmap,out uint alpha); }
+ static class EmbeddedThumbnail {
+  const string ThumbnailRelationship="http://schemas.openxmlformats.org/package/2006/relationships/metadata/thumbnail";
+  const int MaxImageBytes=32*1024*1024;
+  internal static Bitmap Load3mf(string path){
+   using(var package=Package.Open(path,FileMode.Open,FileAccess.Read)){
+    var relationships=package.GetRelationshipsByType(ThumbnailRelationship).ToArray();
+    if(relationships.Length==0)return null;
+    if(relationships.Length!=1||relationships[0].TargetMode!=TargetMode.Internal)throw new IOException("Invalid 3MF thumbnail relationship");
+    var uri=PackUriHelper.ResolvePartUri(new Uri("/",UriKind.Relative),relationships[0].TargetUri);
+    if(!package.PartExists(uri))throw new IOException("3MF thumbnail part is missing");
+    var part=package.GetPart(uri);
+    if(!String.Equals(part.ContentType,"image/png",StringComparison.OrdinalIgnoreCase)&&!String.Equals(part.ContentType,"image/jpeg",StringComparison.OrdinalIgnoreCase))throw new IOException("Unsupported 3MF thumbnail type: "+part.ContentType);
+    using(var source=part.GetStream(FileMode.Open,FileAccess.Read))using(var data=new MemoryStream()){
+     byte[] buffer=new byte[65536];int n;
+     while((n=source.Read(buffer,0,buffer.Length))>0){if(data.Length+n>MaxImageBytes)throw new IOException("3MF thumbnail exceeds size limit");data.Write(buffer,0,n);}
+     data.Position=0;
+     using(var image=Image.FromStream(data,true,true)){
+      if(image.Width<=0||image.Height<=0||image.Width>4096||image.Height>4096)throw new IOException("Invalid 3MF thumbnail dimensions");
+      return new Bitmap(image);
+     }
+    }
+   }
+  }
+  internal static IntPtr MakeDib(Bitmap image,uint cx){
+   double scale=Math.Min(1.0,Math.Min((double)cx/image.Width,(double)cx/image.Height));
+   int w=Math.Max(1,(int)(image.Width*scale)),h=Math.Max(1,(int)(image.Height*scale));
+   using(var b=new Bitmap(w,h,PixelFormat.Format32bppPArgb)){
+    using(var g=Graphics.FromImage(b)){g.CompositingMode=CompositingMode.SourceCopy;g.InterpolationMode=InterpolationMode.HighQualityBicubic;g.DrawImage(image,0,0,w,h);}
+    return Native.MakeDib(b,true);
+   }
+  }
+  internal static bool TryRhino(string path,uint cx,out IntPtr bitmap,out uint alpha){
+   bitmap=IntPtr.Zero;alpha=0;object provider=null;IntPtr result=IntPtr.Zero;
+   try{
+    // Rhino's registered 3DM thumbnail handler reads the private input copy.
+    var type=Type.GetTypeFromCLSID(new Guid("224C4242-E079-426E-8B17-016D513DBC89"),true);
+    provider=Activator.CreateInstance(type);
+    int hr=((IInitializeWithFile)provider).Initialize(path,0);
+    if(hr!=0){Native.Log("Rhino thumbnail initialize failed: 0x"+hr.ToString("X8"));return false;}
+    uint a;hr=((IExternalThumbnailProvider)provider).GetThumbnail(cx,out result,out a);
+    if(hr!=0||result==IntPtr.Zero||a>2){Native.Log("Rhino thumbnail unavailable: 0x"+hr.ToString("X8"));return false;}
+    bitmap=result;result=IntPtr.Zero;alpha=a;return true;
+   }catch(COMException ex){Native.Log("Rhino thumbnail provider unavailable: "+ex.Message);return false;}
+   catch(InvalidCastException ex){Native.Log("Rhino thumbnail provider incompatible: "+ex.Message);return false;}
+   finally{if(result!=IntPtr.Zero)Native.DeleteObject(result);if(provider!=null&&Marshal.IsComObject(provider))Marshal.FinalReleaseComObject(provider);}
+  }
  }
  // Shared with the installer so the same camera contract is tested and used at runtime.
  public sealed class CameraFrame {
@@ -179,7 +231,7 @@ namespace SolidPreview {
     ct.ThrowIfCancellationRequested();proc.ErrorDataReceived+=(sender,e)=>{if(e.Data!=null&&e.Data.IndexOf("error",StringComparison.OrdinalIgnoreCase)>=0)Native.Log("Live MCP stderr: "+e.Data.Substring(0,Math.Min(240,e.Data.Length)));};
     proc.Start();proc.BeginErrorReadLine();input=new StreamWriter(proc.StandardInput.BaseStream,new UTF8Encoding(false));output=proc.StandardOutput;
     var sw=Stopwatch.StartNew();
-    var result=Map(Request("initialize",new {protocolVersion="2025-06-18",capabilities=new object(),clientInfo=new {name="SolidPreview",version="1.0.18"}},ct,sw,20000));
+    var result=Map(Request("initialize",new {protocolVersion="2025-06-18",capabilities=new object(),clientInfo=new {name="SolidPreview",version="1.0.20"}},ct,sw,20000));
     if(Get(result,"protocolVersion")==null)throw new IOException("MCP initialize did not return a protocol version");
     Write(new {jsonrpc="2.0",method="notifications/initialized"},ct,sw,20000);
     Native.Log("Live MCP ready");
@@ -285,8 +337,8 @@ namespace SolidPreview {
   static FileStream TryLock(string path){try{return new FileStream(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);}catch(IOException){return null;}}
   static string InputFor(Prepared p){
    string ext=p.Ext;
-   if(ext!=".stl"&&ext!=".obj"&&ext!=".3mf"&&ext!=".igs"&&ext!=".iges")return p.Model;
-   string input=Path.Combine(p.Work,"import.json"),cmd=(ext==".igs"||ext==".iges")?"doc.open":"file.insert_mesh";
+   if(ext!=".stl"&&ext!=".obj"&&ext!=".3mf"&&ext!=".igs"&&ext!=".iges"&&ext!=".3dm")return p.Model;
+   string input=Path.Combine(p.Work,"import.json"),cmd=(ext==".igs"||ext==".iges"||ext==".3dm")?"doc.open":"file.insert_mesh";
    string escaped=p.Model.Replace("\\","\\\\").Replace("\"","\\\"");
    File.WriteAllText(input,"{\"commands\":[{\"command\":\""+cmd+"\",\"params\":{\"path\":\""+escaped+"\"}}]}",new UTF8Encoding(false));return input;
   }
@@ -389,16 +441,20 @@ namespace SolidPreview {
  }
  [ComVisible(false)] public abstract class Thumb : Base,IInitializeWithStream,IThumbnailProvider {
   protected Thumb(string e):base(e){}
-  public int GetThumbnail(uint cx,out IntPtr bitmap,out uint alpha){bitmap=IntPtr.Zero;alpha=0;Native.Log("Thumbnail enter "+ext);try{if(stream==null||cx==0)return unchecked((int)0x80070057);using(var p=Render.Prepare(stream,ext,CancellationToken.None,8000))using(var src=Render.Load(Render.Finish(p,CancellationToken.None,8000)))using(var fit=Render.Fit(src,(int)Math.Min(cx,4096u),(int)Math.Min(cx,4096u)))using(var b=new Bitmap(fit.Width,fit.Height,PixelFormat.Format32bppRgb)){using(var g=Graphics.FromImage(b)){g.DrawImageUnscaled(fit,0,0);}Native.Log("Thumbnail creating DIB "+b.Width+"x"+b.Height);bitmap=Native.MakeDib(b);alpha=1;Native.Log("Thumbnail DIB ready");return 0;}}catch(Exception ex){Native.Log("Thumbnail error "+ex.GetType().Name+" HRESULT=0x"+Marshal.GetHRForException(ex).ToString("X8")+": "+ex.Message);return unchecked((int)0x80004005);}finally{stream=null;Native.Log("Thumbnail leave");}}
+  public int GetThumbnail(uint cx,out IntPtr bitmap,out uint alpha){bitmap=IntPtr.Zero;alpha=0;Native.Log("Thumbnail enter "+ext);try{if(stream==null||cx==0)return unchecked((int)0x80070057);using(var p=Render.Prepare(stream,ext,CancellationToken.None,8000)){
+   if(ext==".3dm"&&EmbeddedThumbnail.TryRhino(p.Model,cx,out bitmap,out alpha)){Native.Log("Using Rhino embedded thumbnail");return 0;}
+   if(ext==".3mf")using(var embedded=EmbeddedThumbnail.Load3mf(p.Model)){if(embedded!=null){bitmap=EmbeddedThumbnail.MakeDib(embedded,Math.Min(cx,4096u));alpha=2;Native.Log("Using 3MF embedded thumbnail");return 0;}}
+   using(var src=Render.Load(Render.Finish(p,CancellationToken.None,8000)))using(var fit=Render.Fit(src,(int)Math.Min(cx,4096u),(int)Math.Min(cx,4096u)))using(var b=new Bitmap(fit.Width,fit.Height,PixelFormat.Format32bppRgb)){using(var g=Graphics.FromImage(b)){g.DrawImageUnscaled(fit,0,0);}Native.Log("Thumbnail creating DIB "+b.Width+"x"+b.Height);bitmap=Native.MakeDib(b);alpha=1;Native.Log("Thumbnail DIB ready");return 0;}
+  }}catch(Exception ex){Native.Log("Thumbnail error "+ex.GetType().Name+" HRESULT=0x"+Marshal.GetHRForException(ex).ToString("X8")+": "+ex.Message);return unchecked((int)0x80004005);}finally{stream=null;Native.Log("Thumbnail leave");}}
 
  }
  [ComVisible(false)] public abstract class Preview : Base,IInitializeWithStream,IPreviewHandler,IOleWindow,IObjectWithSite {
-  protected Preview(string e):base(e){Native.Log("Preview constructed v1.0.18 "+e);}
+  protected Preview(string e):base(e){Native.Log("Preview constructed v1.0.20 "+e);}
   IntPtr parent; RECT bounds; object site; PreviewSession session;
   public int SetWindow(IntPtr h,ref RECT r){parent=h;bounds=r;var s=session;if(s!=null)s.Update(h,r);Native.Log("Preview SetWindow "+ext);return 0;}
   public int SetRect(ref RECT r){bounds=r;var s=session;if(s!=null)s.Update(parent,r);Native.Log("Preview SetRect "+ext);return 0;}
   public int DoPreview(){
-   Native.Log("Preview enter v1.0.18 "+ext);
+   Native.Log("Preview enter v1.0.20 "+ext);
    if(parent==IntPtr.Zero||stream==null||session!=null)return unchecked((int)0x80004005);
    Render.Prepared p=null;
    try{
@@ -871,6 +927,8 @@ namespace SolidPreview {
 [ComVisible(true), Guid("0876d9a4-3387-4856-96dc-7ad02ed67f9c"), ClassInterface(ClassInterfaceType.None)] public sealed class FOBJThumb : Thumb { public FOBJThumb():base(".obj"){} }
 [ComVisible(true), Guid("a6b61bdf-7271-43c0-b236-5f31cad32af5"), ClassInterface(ClassInterfaceType.None)] public sealed class F3MFPreview : Preview { public F3MFPreview():base(".3mf"){} }
 [ComVisible(true), Guid("2c5361fb-a224-4bed-b1f3-45c12fc815f0"), ClassInterface(ClassInterfaceType.None)] public sealed class F3MFThumb : Thumb { public F3MFThumb():base(".3mf"){} }
+[ComVisible(true), Guid("56f9153f-12bf-4639-ad08-f85bbe430273"), ClassInterface(ClassInterfaceType.None)] public sealed class F3DMPreview : Preview { public F3DMPreview():base(".3dm"){} }
+[ComVisible(true), Guid("078799bc-1f65-402c-9717-507662328b78"), ClassInterface(ClassInterfaceType.None)] public sealed class F3DMThumb : Thumb { public F3DMThumb():base(".3dm"){} }
 [ComVisible(true), Guid("da531fce-9297-4b21-961a-5b0477398d78"), ClassInterface(ClassInterfaceType.None)] public sealed class FIGSPreview : Preview { public FIGSPreview():base(".igs"){} }
 [ComVisible(true), Guid("4d35a185-bcdf-4711-8dc9-a66444af05ca"), ClassInterface(ClassInterfaceType.None)] public sealed class FIGSThumb : Thumb { public FIGSThumb():base(".igs"){} }
 [ComVisible(true), Guid("83be2b62-aa17-4012-b613-5bfeaa579ee3"), ClassInterface(ClassInterfaceType.None)] public sealed class FIGESPreview : Preview { public FIGESPreview():base(".iges"){} }

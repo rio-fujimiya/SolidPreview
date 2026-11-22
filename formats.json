@@ -35,6 +35,13 @@
     "thumbClass": "SolidPreview.F3MFThumb"
   },
   {
+    "ext": ".3dm",
+    "preview": "{56f9153f-12bf-4639-ad08-f85bbe430273}",
+    "previewClass": "SolidPreview.F3DMPreview",
+    "thumb": "{078799bc-1f65-402c-9717-507662328b78}",
+    "thumbClass": "SolidPreview.F3DMThumb"
+  },
+  {
     "ext": ".igs",
     "preview": "{da531fce-9297-4b21-961a-5b0477398d78}",
     "previewClass": "SolidPreview.FIGSPreview",

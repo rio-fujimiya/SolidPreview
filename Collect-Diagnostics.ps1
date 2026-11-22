@@ -7,7 +7,7 @@ $previewType = '{8895B1C6-B41F-4C1C-A562-0D564250836F}'
 $cu = [Microsoft.Win32.Registry]::CurrentUser
 $cr = [Microsoft.Win32.Registry]::ClassesRoot
 Write-Host '=== Effective preview registrations ==='
-foreach ($ext in @('.stp','.step','.stl','.obj','.3mf','.sc','.solidcraft','.igs','.iges')) {
+foreach ($ext in @('.stp','.step','.stl','.obj','.3mf','.3dm','.sc','.solidcraft','.igs','.iges')) {
     foreach ($base in @($ext,"SystemFileAssociations\$ext")) {
         $k = $cr.OpenSubKey("$base\shellex\$previewType")
         if (-not $k) { continue }

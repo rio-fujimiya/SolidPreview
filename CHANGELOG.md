@@ -2,6 +2,11 @@
 
 Historical source-package notes, in reverse version order. These describe changes, not proof of Windows integration testing.
 
+## Unreleased
+
+- Added opt-in Rhino `.3dm` preview and thumbnail support (enable with `-Extensions`); the installer smoke-tests it with an included synthetic box.
+- Prefer embedded 3MF thumbnails and, when available, thumbnails returned by the installed Rhino handler for 3DM.
+
 ## v1.0.18
 
 - Mouse-wheel zoom (1.2x per notch, bounded to 0.2–12x) and middle-button drag to pan.

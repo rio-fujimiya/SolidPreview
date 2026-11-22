@@ -8,12 +8,13 @@ foreach ($script in (Get-ChildItem -LiteralPath $root -Filter '*.ps1' -Recurse))
     if ($errors.Count) { throw ("PowerShell parse error in " + $script.Name + ': ' + ($errors -join '; ')) }
 }
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+$windowsBase = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsBase.dll'
 if (-not (Test-Path -LiteralPath $csc)) { throw 'Framework C# compiler not found.' }
 $tmp = Join-Path $env:TEMP ('SolidPreview-check-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 try {
     $dll = Join-Path $tmp 'SolidPreview.dll'
-    & $csc /nologo /target:library /platform:x64 /optimize+ "/out:$dll" /r:System.Drawing.dll /r:System.Web.Extensions.dll (Join-Path $root 'Handler.cs')
+    & $csc /nologo /target:library /platform:x64 /optimize+ "/out:$dll" /r:System.Drawing.dll /r:System.Web.Extensions.dll "/r:$windowsBase" (Join-Path $root 'Handler.cs')
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $dll)) { throw 'C# compile failed.' }
     # Load bytes so the test does not lock its temporary DLL file.
     $assembly = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
