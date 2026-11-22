@@ -1,0 +1,65 @@
+[
+  {
+    "ext": ".stl",
+    "preview": "{064d6d4e-5233-4c7f-924c-9299a5f09513}",
+    "previewClass": "SolidPreview.FSTLPreview",
+    "thumb": "{1a19a1f4-7f5a-4d7a-bd90-f55dee3ebc30}",
+    "thumbClass": "SolidPreview.FSTLThumb"
+  },
+  {
+    "ext": ".stp",
+    "preview": "{17ee02dd-fa74-43f3-b190-2de931ff443a}",
+    "previewClass": "SolidPreview.FSTPPreview",
+    "thumb": "{54229725-318d-4708-9d45-4d3421d6c5e1}",
+    "thumbClass": "SolidPreview.FSTPThumb"
+  },
+  {
+    "ext": ".step",
+    "preview": "{26d0dbd4-d300-462d-9cbf-e4c7cb48e211}",
+    "previewClass": "SolidPreview.FSTEPPreview",
+    "thumb": "{a8c3f70c-66e9-4eec-81cc-6d0de456b307}",
+    "thumbClass": "SolidPreview.FSTEPThumb"
+  },
+  {
+    "ext": ".obj",
+    "preview": "{e7f52ec4-b300-4787-9cc9-59ce5e9c05dc}",
+    "previewClass": "SolidPreview.FOBJPreview",
+    "thumb": "{0876d9a4-3387-4856-96dc-7ad02ed67f9c}",
+    "thumbClass": "SolidPreview.FOBJThumb"
+  },
+  {
+    "ext": ".3mf",
+    "preview": "{a6b61bdf-7271-43c0-b236-5f31cad32af5}",
+    "previewClass": "SolidPreview.F3MFPreview",
+    "thumb": "{2c5361fb-a224-4bed-b1f3-45c12fc815f0}",
+    "thumbClass": "SolidPreview.F3MFThumb"
+  },
+  {
+    "ext": ".igs",
+    "preview": "{da531fce-9297-4b21-961a-5b0477398d78}",
+    "previewClass": "SolidPreview.FIGSPreview",
+    "thumb": "{4d35a185-bcdf-4711-8dc9-a66444af05ca}",
+    "thumbClass": "SolidPreview.FIGSThumb"
+  },
+  {
+    "ext": ".iges",
+    "preview": "{83be2b62-aa17-4012-b613-5bfeaa579ee3}",
+    "previewClass": "SolidPreview.FIGESPreview",
+    "thumb": "{0ed1b648-314a-4eef-a3bb-3017556bbf5c}",
+    "thumbClass": "SolidPreview.FIGESThumb"
+  },
+  {
+    "ext": ".sc",
+    "preview": "{aefda98d-4234-4f96-8ac8-1d2f51786f7b}",
+    "previewClass": "SolidPreview.FSCPreview",
+    "thumb": "{de7b9193-b47c-4b99-b378-2260375eef50}",
+    "thumbClass": "SolidPreview.FSCThumb"
+  },
+  {
+    "ext": ".solidcraft",
+    "preview": "{204da88b-d7f3-4f04-b26c-0df4ee54888b}",
+    "previewClass": "SolidPreview.FSOLIDCRAFTPreview",
+    "thumb": "{0fdd0788-c656-4250-b609-908f41b71de4}",
+    "thumbClass": "SolidPreview.FSOLIDCRAFTThumb"
+  }
+]

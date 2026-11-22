@@ -1,0 +1,34 @@
+# Local build and packaging outputs
+bin/
+obj/
+artifacts/
+dist/
+*.dll
+*.exe
+*.pdb
+*.zip
+*.log
+# Runtime data and local settings
+cache-v1/
+restore.json
+*.reg
+.env
+.env.*
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+Desktop.ini
+# Local model files (use intentional synthetic fixtures if needed)
+*.stl
+*.step
+*.stp
+*.iges
+*.igs
+*.obj
+*.3mf
+*.sc
+*.solidcraft

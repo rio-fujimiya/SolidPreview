@@ -1,0 +1,30 @@
+# Testing and release checklist
+
+## Automated, no installation
+
+On Windows x64 run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Check-Build.ps1
+```
+
+This validates PowerShell syntax, compiles using the same framework compiler as the installer, and checks the extension-to-COM metadata against the compiled types. It does not register COM classes or launch SolidCraft. The GitHub workflow runs this check on a Windows runner; no successful run is claimed before it actually executes.
+
+## Manual integration (not covered by CI)
+
+Use a disposable Windows 11 x64 VM or account and an independently installed CLI. Record exact OS build, CLI version, package version and results.
+
+- Fresh install as a standard user; check all applicable PASS messages.
+- Preview and thumbnails for every registered format, including small and large models.
+- Resize narrow/wide; orbit in both axes; ViewCube face/edge/corner selection; four 90° arrows at all six face views; Home.
+- Wheel zoom in/out, including multiple rapid notches and zoom limits. Middle drag in cardinal, oblique and pole views; confirm the model follows the pointer. Orbit after zoom/pan and confirm scale and target are retained. Each cube face/edge/corner/arrow/Home must reset zoom and target. Check release/idle produces a full-resolution frame. Middle-click without moving must leave the frame unchanged.
+- Rapid selection changes, repeated rotations, cache hits and concurrent thumbnail requests; verify no persistent loading indicator or Explorer hang.
+- Test static and live fallback, PreviewOnly and ThumbnailOnly; test invalid and oversized models with safe fixtures.
+- Update with the BAT; confirm new version loads; uninstall and verify prior handler values and default apps are preserved.
+- Check cache removal and no abandoned CLI workers. Do not publish runtime claims for untested cases.
+
+## Release packaging
+
+Keep the source package free of personal paths, local binaries, model files, screenshots of confidential data, registry export journals and cached PNGs. Publish a source release after confirming licensing and the build/integration status. Keep the shell extension and upstream SolidCraft version numbers distinct.
+
+The source-build CI also verifies camera zoom bounds and pan projection across 60 orientation/aspect combinations; actual mouse input routing and rendering remain manual Windows checks.

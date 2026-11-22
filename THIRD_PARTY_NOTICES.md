@@ -1,0 +1,5 @@
+# Third-party notices
+
+This project is an independent integration with the separately installed [SolidCraft](https://docs.solidcraft.io/) application and `solidcraft-cli`. SolidCraft's core code is licensed MIT OR Apache-2.0; its [brand and interface materials](https://github.com/tangency-labs/solidcraft/blob/main/LICENSE-BRAND) have separate terms. The current brand terms require the maintainers' written permission to use the SolidCraft name, logo or app icon to name, promote or endorse another product. Its binaries and source tree are not distributed in this repository. Consult the upstream distribution for its applicable license and notices.
+
+This source uses Windows Shell/COM APIs and .NET Framework libraries installed with Windows. Windows and the framework are not distributed here. The demonstration GIF includes Windows interface elements and third-party application icons, which are not relicensed by this project. Microsoft, SolidCraft and CAD vendor names identify compatibility or dependencies only; no endorsement is implied.

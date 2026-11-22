@@ -1,0 +1,15 @@
+name: Windows build checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile shell extension and verify COM metadata and camera math
+        shell: powershell
+        run: .\tests\Check-Build.ps1
